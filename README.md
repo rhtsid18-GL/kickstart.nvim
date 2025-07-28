@@ -239,3 +239,5 @@ sudo pacman -S --noconfirm --needed gcc make git ripgrep fd unzip neovim
 ```
 </details>
 
+## Additional steps for an ideal setup on macOS :
+- Watch this video from Youtube on how to setup a stylized terminal in macOS : https://drive.google.com/file/d/18tmzBlvvr4075JlnlyCt5_H1EUfPEi1m/view?usp=drive_link
