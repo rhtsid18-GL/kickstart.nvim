@@ -102,7 +102,7 @@ vim.g.have_nerd_font = false
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.o.relativenumber = true
+vim.o.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.o.mouse = 'a'
@@ -134,6 +134,11 @@ vim.o.signcolumn = 'yes'
 -- Decrease update time
 vim.o.updatetime = 250
 
+-- Auto cmd to show floating diagnostic
+vim.cmd [[
+  autocmd CursorHold * lua vim.diagnostic.open_float(nil, { focus = false, border = "rounded" })
+]]
+
 -- Decrease mapped sequence wait time
 vim.o.timeoutlen = 300
 
@@ -151,6 +156,9 @@ vim.o.splitbelow = true
 --   and `:help lua-options-guide`
 vim.o.list = true
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
+
+-- Setting foldmethod to indent so that the `za` command works for toggling folding of code blocks
+vim.opt.foldmethod = 'indent'
 
 -- Preview substitutions live, as you type!
 vim.o.inccommand = 'split'
@@ -271,18 +279,89 @@ require('lazy').setup({
   -- options to `gitsigns.nvim`.
   --
   -- See `:help gitsigns` to understand what the configuration keys do
-  { -- Adds git related signs to the gutter, as well as utilities for managing changes
+  -- Config I added with help from google gemini.
+  { -- Adds git related signs to the gutter, as well as utilities for managing git
     'lewis6991/gitsigns.nvim',
-    opts = {
-      signs = {
-        add = { text = '+' },
-        change = { text = '~' },
-        delete = { text = '_' },
-        topdelete = { text = '‾' },
-        changedelete = { text = '~' },
-      },
-    },
+    config = function()
+      require('gitsigns').setup {
+        signs = {
+          add = { text = '▎' },
+          change = { text = '▎' },
+          delete = { text = '' },
+          topdelete = { text = '' },
+          changedelete = { text = '▎' },
+          untracked = { text = '▎' },
+        },
+        -- Keymaps
+        on_attach = function(bufnr)
+          local gs = package.loaded.gitsigns
+
+          local function map(mode, l, r, opts)
+            opts = opts or {}
+            opts.buffer = bufnr
+            vim.keymap.set(mode, l, r, opts)
+          end
+
+          -- Navigation
+          map('n', ']c', function()
+            if vim.wo.diff then
+              return ']c'
+            end
+            vim.schedule(function()
+              gs.next_hunk()
+            end)
+            return '<Ignore>'
+          end, { expr = true, desc = 'Jump to next git [c]hange' })
+
+          map('n', '[c', function()
+            if vim.wo.diff then
+              return '[c'
+            end
+            vim.schedule(function()
+              gs.prev_hunk()
+            end)
+            return '<Ignore>'
+          end, { expr = true, desc = 'Jump to previous git [c]hange' })
+
+          -- Actions
+          map('n', '<leader>hs', gs.stage_hunk, { desc = '[H]unk [S]tage' })
+          map('n', '<leader>hr', gs.reset_hunk, { desc = '[H]unk [R]eset' })
+          map('v', '<leader>hs', function()
+            gs.stage_hunk { vim.fn.line '.', vim.fn.line 'v' }
+          end, { desc = '[H]unk [S]tage' })
+          map('v', '<leader>hr', function()
+            gs.reset_hunk { vim.fn.line '.', vim.fn.line 'v' }
+          end, { desc = '[H]unk [R]eset' })
+          map('n', '<leader>hS', gs.stage_buffer, { desc = '[H]unk [S]tage buffer' })
+          map('n', '<leader>hu', gs.undo_stage_hunk, { desc = '[H]unk [U]ndo stage' })
+          map('n', '<leader>hR', gs.reset_buffer, { desc = '[H]unk [R]eset buffer' })
+          map('n', '<leader>hp', gs.preview_hunk, { desc = '[H]unk [P]review' })
+          map('n', '<leader>hb', function()
+            gs.blame_line { full = true }
+          end, { desc = '[H]unk [B]lame Line' })
+          map('n', '<leader>tb', gs.toggle_current_line_blame, { desc = '[T]oggle [B]lame Current Line' })
+          map('n', '<leader>hd', gs.diffthis, { desc = '[H]unk [D]iff Against Index' })
+          map('n', '<leader>hD', function()
+            gs.diffthis '~'
+          end, { desc = '[H]unk [D]iff Against Last Commit' })
+          map('n', '<leader>td', gs.toggle_deleted, { desc = '[T]oggle [D]eleted Git Signs' })
+        end,
+      }
+    end,
   },
+  -- Default Config.
+  -- { -- Adds git related signs to the gutter, as well as utilities for managing changes
+  --   'lewis6991/gitsigns.nvim',
+  --   opts = {
+  --     signs = {
+  --       add = { text = '+' },
+  --       change = { text = '~' },
+  --       delete = { text = '_' },
+  --       topdelete = { text = '‾' },
+  --       changedelete = { text = '~' },
+  --     },
+  --   },
+  -- },
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -630,7 +709,7 @@ require('lazy').setup({
       -- See :help vim.diagnostic.Opts
       vim.diagnostic.config {
         severity_sort = true,
-        float = { border = 'rounded', source = 'if_many' },
+        float = { border = 'rounded', source = 'always', max_width = 80 },
         underline = { severity = vim.diagnostic.severity.ERROR },
         signs = vim.g.have_nerd_font and {
           text = {
@@ -640,19 +719,7 @@ require('lazy').setup({
             [vim.diagnostic.severity.HINT] = '󰌶 ',
           },
         } or {},
-        virtual_text = {
-          source = 'if_many',
-          spacing = 2,
-          format = function(diagnostic)
-            local diagnostic_message = {
-              [vim.diagnostic.severity.ERROR] = diagnostic.message,
-              [vim.diagnostic.severity.WARN] = diagnostic.message,
-              [vim.diagnostic.severity.INFO] = diagnostic.message,
-              [vim.diagnostic.severity.HINT] = diagnostic.message,
-            }
-            return diagnostic_message[diagnostic.severity]
-          end,
-        },
+        virtual_text = false,
       }
 
       -- LSP servers and clients are able to communicate to each other what features they support.
@@ -736,46 +803,46 @@ require('lazy').setup({
     end,
   },
 
-  { -- Autoformat
-    'stevearc/conform.nvim',
-    event = { 'BufWritePre' },
-    cmd = { 'ConformInfo' },
-    keys = {
-      {
-        '<leader>f',
-        function()
-          require('conform').format { async = true, lsp_format = 'fallback' }
-        end,
-        mode = '',
-        desc = '[F]ormat buffer',
-      },
-    },
-    opts = {
-      notify_on_error = false,
-      format_on_save = function(bufnr)
-        -- Disable "format_on_save lsp_fallback" for languages that don't
-        -- have a well standardized coding style. You can add additional
-        -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
-        if disable_filetypes[vim.bo[bufnr].filetype] then
-          return nil
-        else
-          return {
-            timeout_ms = 500,
-            lsp_format = 'fallback',
-          }
-        end
-      end,
-      formatters_by_ft = {
-        lua = { 'stylua' },
-        -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
-        --
-        -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
-      },
-    },
-  },
+  -- { -- Autoformat
+  --   'stevearc/conform.nvim',
+  --   event = { 'BufWritePre' },
+  --   cmd = { 'ConformInfo' },
+  --   keys = {
+  --     {
+  --       '<leader>f',
+  --       function()
+  --         require('conform').format { async = true, lsp_format = 'fallback' }
+  --       end,
+  --       mode = '',
+  --       desc = '[F]ormat buffer',
+  --     },
+  --   },
+  --   opts = {
+  --     notify_on_error = false,
+  --     format_on_save = function(bufnr)
+  --       -- Disable "format_on_save lsp_fallback" for languages that don't
+  --       -- have a well standardized coding style. You can add additional
+  --       -- languages here or re-enable it for the disabled ones.
+  --       local disable_filetypes = { c = true, cpp = true }
+  --       if disable_filetypes[vim.bo[bufnr].filetype] then
+  --         return nil
+  --       else
+  --         return {
+  --           timeout_ms = 500,
+  --           lsp_format = 'fallback',
+  --         }
+  --       end
+  --     end,
+  --     formatters_by_ft = {
+  --       lua = { 'stylua' },
+  --       -- Conform can also run multiple formatters sequentially
+  --       -- python = { "isort", "black" },
+  --       --
+  --       -- You can use 'stop_after_first' to run the first available formatter from the list
+  --       -- javascript = { "prettierd", "prettier", stop_after_first = true },
+  --     },
+  --   },
+  -- },
 
   { -- Autocompletion
     'saghen/blink.cmp',
@@ -937,6 +1004,26 @@ require('lazy').setup({
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
+  },
+  {
+    'MeanderingProgrammer/render-markdown.nvim',
+    -- 1. Specify dependencies
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      -- If you use nvim-mini for icons or other features, add it here:
+      -- 'nvim-mini/mini.nvim',
+    },
+    -- 2. Configure when the plugin loads (Only for markdown files)
+    ft = { 'markdown' },
+
+    -- 3. Configure the plugin's behavior
+    opts = {
+      -- Set to true to enable rendering on startup for markdown files
+      enabled = true,
+      -- Specify the modes where rendering is active (n=Normal, c=Command, t=Terminal)
+      -- The marks disappear in other modes (like Insert) for easier editing.
+      render_modes = { 'n', 'c', 't' },
+    },
   },
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
