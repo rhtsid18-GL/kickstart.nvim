@@ -1,0 +1,11 @@
+/* ~/.config/nvim/mkdp_custom.css */
+
+/*
+* The common class for the main content container in markdown themes
+* (like the GitHub theme) is often 'markdown-body' or similar.
+* Inspect the element in your browser to confirm the exact class.
+*/
+#page-ctn {
+	max-width: 100%;
+}
+

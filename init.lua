@@ -177,6 +177,9 @@ vim.o.confirm = true
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
+-- Keymap for toggling markdown preview
+vim.keymap.set('n', '<Leader>mpt', ':MarkdownPreviewToggle<CR>', { desc = 'Toggle Markdown Preview' })
+
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
@@ -1004,6 +1007,23 @@ require('lazy').setup({
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
+  },
+  {
+    'iamcco/markdown-preview.nvim',
+    cmd = { 'MarkdownPreviewToggle', 'MarkdownPreview', 'MarkdownPreviewStop' },
+    build = function()
+      -- The installation step required by the plugin's author
+      require('lazy').load({ plugins = { 'markdown-preview.nvim' } })
+      vim.fn['mkdp#util#install']()
+    end,
+    init = function()
+      vim.g.mkdp_highlight_css = vim.fn.expand('~/.config/nvim/markdownPreveiwCustom.css')
+      vim.g.mkdp_theme = 'github' -- Optional: ensure you are using a standard theme
+    end,
+    ft = { 'markdown' }, -- Only load for markdown files
+    keys = {
+      { '<leader>mp', '<cmd>MarkdownPreviewToggle<CR>', desc = 'Markdown Preview Toggle' }
+    }
   },
   {
     'MeanderingProgrammer/render-markdown.nvim',
